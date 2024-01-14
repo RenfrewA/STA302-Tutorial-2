@@ -1,0 +1,86 @@
+---
+title: "STA302 Mini-essay 2"
+author: "Renfrew Ao-Ieong"
+date: "`r Sys.time()`"
+date-format: long
+format: pdf
+abstract: "There are currently 50 Automated Speed Enforcement (ASE) systems installed in Community Safety Zones near schools in the city of Toronto. In each ward, there are 2 systems installed which are roated to different locations every month. We are interested in the number of speeding tickets issued in each ward from the ASE system during the most recent month of the dataset. We found that ward 10 had the most amount of speeding tickets issued while ward 15 had the least amount of speeding tickets issued which totaled 5977 and 102 respectively."
+---
+
+```{r}
+install.packages('tinytex')
+```
+
+```{r}
+#### Workspace setup ####
+# Comment out these lines after installing packages
+install.packages("knitr")
+install.packages("janitor")
+install.packages("opendatatoronto")
+install.packages("tidyverse")
+#
+
+library(knitr)
+library(janitor)
+library(opendatatoronto)
+library(tidyverse)
+```
+
+
+```{r}
+# We download the dataset called Automated Speed Enforcement (ASE) Charges and save it to a csv file
+
+toronto_speed_enforcement_charges <-
+  # Each package is associated with a unique id  found in the "For 
+  # Developers" tab of the relevant page from Open Data Toronto
+  # https://open.toronto.ca/dataset/automated-speed-enforcement-ase-charges/
+  list_package_resources("537923d1-a6c8-4b9c-9d55-fa47d9d7ddab") |>
+  get_resource()
+
+write_csv(
+  x = toronto_speed_enforcement_charges,
+  file = "toronto_speed_enforcement_charges.csv"
+)
+
+head(toronto_speed_enforcement_charges)
+```
+
+```{r}
+# We clean up the names using clean_names and we select only columns ward and x45231.
+# Why is it called x45231? I don't have the answer. This is just how the data came from the city of Toronto. It is supposed to represent the number of tickets issued in the month November 2023 for a certain location.
+# We then filter out the rows where there was no speed cameras at that location during this month.
+# Next, we arrange the ward column in ascending order to make it look neat in the table
+# We then use mutate_at to change the values in the x45231 column to be numeric instead of char
+# Since we have multiple locations in the same ward, we condense it into one row by taking the sum of tickets issued for locations in the same ward and also change the name from x45231 to tickets_issued.
+
+toronto_speed_enforcement_charges_clean <-
+  clean_names(toronto_speed_enforcement_charges) |>
+  select(ward, x45231) |>
+  filter(x45231 != "-") |>
+  arrange(ward) |>
+  mutate_at(c('x45231'), as.numeric) |>
+  group_by(ward) |>
+  summarise("tickets_issued" = sum(x45231))
+head(toronto_speed_enforcement_charges_clean)
+```
+
+
+```{r}
+# We build the graph to visualize the data that we obtained using ggplot
+# We set up the ggplot object, specifying that the x-axis should represent the "ward" variable and the y-axis should represent the "tickets_issued" variable.
+# Next, we give the graph a title and set the text sixe of title to 12 with theme()
+# Then we add bars to the plot with geom_bar representing number of tickets issued. It uses the "identity" statistical transformation, meaning the heights are directly based on the data. We also set the colour of the bars to blue.
+# We set the theme to minimal and set the x and y axis labels
+# Finally, for better readability, we show every ward value in the x axis and add more values in the y axis.
+
+toronto_speed_enforcement_charges_clean |>
+  ggplot(aes(x=ward, y=tickets_issued)) +
+  ggtitle("Automated Speed Enforcement Charges by Ward in Toronto during November 2023") +
+  geom_bar(stat='identity', fill="#274490") +
+  theme_minimal() +
+  labs(x = "Ward", y = "Number of Speeding Tickets Issued") + 
+  scale_x_continuous(labels=as.character(toronto_speed_enforcement_charges_clean$ward),breaks=toronto_speed_enforcement_charges_clean$ward) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  theme(plot.title = element_text(size = 12))
+```
+
